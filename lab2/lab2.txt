@@ -60,7 +60,7 @@ Query OK, 0 rows affected (0.02 sec)
 mysql> create table jbaccount (
     -> id int not null,
     -> balance int not null default 0,
-    -> customer int,
+    -> customer int not null,
     -> primary key (id),
     -> constraint fk_cust_acc foreign key (customer) references jbcustomer (id)
     -> );
@@ -90,10 +90,14 @@ mysql> create table jbdeposit (
     -> );
 Query OK, 0 rows affected (0.02 sec)
 
-mysql> insert into jbaccount (id) select distinct account from jbdebit;
-Query OK, 5 rows affected (0.00 sec)
-Records: 5  Duplicates: 0  Warnings: 0
+mysql> delete from jbsale;
+Query OK, 8 rows affected (0.01 sec)
+
+mysql> delete from jbdebit;
+Query OK, 6 rows affected (0.00 sec)
 
 mysql> alter table jbdebit add constraint fk_debit_acc foreign key (account) references jbaccount (id);
 Query OK, 6 rows affected (0.03 sec)
 Records: 6  Duplicates: 0  Warnings: 0
+
+We need to remove data from jbsale in order to remove data from jbdebit (foreign key constraint). We need to remove data from jbdebit in order to add a foreign key to account. This is because no accounts exists in the account table (we havn't added them yet), therefor, the foreign key constraint fk_debit_acc would fail for the data in the table referencing to non-existing keys in jbaccount.
