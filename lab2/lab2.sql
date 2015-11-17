@@ -21,3 +21,46 @@ alter table jbdept add constraint fk_dept_mgr foreign key (manager) references j
 update jbmanager
 set bonus=bonus+10000
 where id in (select manager from jbdept);
+
+create table jbcustomer (
+	id int not null,
+	name varchar(20),
+	address varchar(40),
+	city int,
+	primary key (id),
+	constraint fk_cust_living foreign key (city) references jbcity (id)
+);
+
+create table jbaccount (
+	id int not null,
+	balance int not null default 0,
+	customer int,
+	primary key (id),
+	constraint fk_cust_acc foreign key (customer) references jbcustomer (id)
+);
+
+create table jbwithdrawal (
+	id int,
+	sdate timestamp not null default current_timestamp,
+	amount int not null,
+	account int not null,
+	employee int not null,
+	primary key (id),
+	constraint fk_with_acc foreign key (account) references jbaccount (id),
+	constraint fk_with_employee foreign key (employee) references jbemployee (id)
+);
+
+create table jbdeposit (
+	id int,
+	sdate timestamp not null default current_timestamp,
+	amount int not null,
+	account int not null,
+	employee int not null,
+	primary key (id),
+	constraint fk_depo_acc foreign key (account) references jbaccount (id),
+	constraint fk_depo_employee foreign key (employee) references jbemployee (id)
+);
+
+insert into jbaccount (id) select distinct account from jbdebit;
+
+alter table jbdebit add constraint fk_debit_acc foreign key (account) references jbaccount (id);

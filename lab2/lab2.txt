@@ -1,6 +1,6 @@
 Lab2
 
-Uppg 3
+Question 3, implement extensions:
 mysql> create table jbmanager ( id int NOT NULL, bonus int NOT NULL DEFAULT 0, primary key (id), constraint fk_employee_id foreign key (id) references jbemployee (id) );
 Query OK, 0 rows affected (0.02 sec)
 
@@ -27,8 +27,8 @@ mysql> alter table jbdept add constraint fk_dept_mgr foreign key (manager) refer
 Query OK, 19 rows affected (0.03 sec)
 Records: 19  Duplicates: 0  Warnings: 0
 
-
-The bonus value should have a default value of 0. If it were null, you could not add it with an existing salary unless the manager had a bonus. Example:
+Do you have to initialize the bonus attribute to a value? Why?
+The bonus value should have a default value of 0. If it were null, you can't add it with an existing salary unless the manager already have a bonus. This is because it is not possible to perform addition with null values. Example:
 
 mysql> select 100 + null;
 +------------+
@@ -38,28 +38,62 @@ mysql> select 100 + null;
 +------------+
 1 row in set (0.00 sec)
 
+Question 4, add bonus to department managers:
 mysql> update jbmanager
     -> set bonus=bonus+10000
     -> where id in (select manager from jbdept);
 Query OK, 11 rows affected (0.01 sec)
 Rows matched: 11  Changed: 11  Warnings: 0
 
-Uppg 4
-mysql> select * from jbmanager;
-+-----+-------+
-| id  | bonus |
-+-----+-------+
-|  10 | 10000 |
-|  13 | 10000 |
-|  26 | 10000 |
-|  32 | 10000 |
-|  33 | 10000 |
-|  35 | 10000 |
-|  37 | 10000 |
-|  55 | 10000 |
-|  98 | 10000 |
-| 129 | 10000 |
-| 157 | 10000 |
-| 199 |     0 |
-+-----+-------+
-12 rows in set (0.00 sec)
+Question 5, implement extension:
+
+mysql> create table jbcustomer (
+    -> id int not null,
+    -> name varchar(20),
+    -> address varchar(40),
+    -> city int,
+    -> primary key (id),
+    -> constraint fk_cust_living foreign key (city) references jbcity (id)
+    -> );
+Query OK, 0 rows affected (0.02 sec)
+
+mysql> create table jbaccount (
+    -> id int not null,
+    -> balance int not null default 0,
+    -> customer int,
+    -> primary key (id),
+    -> constraint fk_cust_acc foreign key (customer) references jbcustomer (id)
+    -> );
+Query OK, 0 rows affected (0.02 sec)
+
+mysql> create table jbwithdrawal (
+    -> id int,
+    -> sdate timestamp not null default current_timestamp,
+    -> amount int not null,
+    -> account int not null,
+    -> employee int not null,
+    -> primary key (id),
+    -> constraint fk_with_acc foreign key (account) references jbaccount (id),
+    -> constraint fk_with_employee foreign key (employee) references jbemployee (id)
+    -> );
+Query OK, 0 rows affected (0.01 sec)
+
+mysql> create table jbdeposit (
+    -> id int,
+    -> sdate timestamp not null default current_timestamp,
+    -> amount int not null,
+    -> account int not null,
+    -> employee int not null,
+    -> primary key (id),
+    -> constraint fk_depo_acc foreign key (account) references jbaccount (id),
+    -> constraint fk_depo_employee foreign key (employee) references jbemployee (id)
+    -> );
+Query OK, 0 rows affected (0.02 sec)
+
+mysql> insert into jbaccount (id) select distinct account from jbdebit;
+Query OK, 5 rows affected (0.00 sec)
+Records: 5  Duplicates: 0  Warnings: 0
+
+mysql> alter table jbdebit add constraint fk_debit_acc foreign key (account) references jbaccount (id);
+Query OK, 6 rows affected (0.03 sec)
+Records: 6  Duplicates: 0  Warnings: 0
