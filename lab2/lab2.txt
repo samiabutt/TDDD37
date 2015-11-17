@@ -1,0 +1,65 @@
+Lab2
+
+Uppg 3
+mysql> create table jbmanager ( id int NOT NULL, bonus int NOT NULL DEFAULT 0, primary key (id), constraint fk_employee_id foreign key (id) references jbemployee (id) );
+Query OK, 0 rows affected (0.02 sec)
+
+mysql> insert into jbmanager (id)
+    -> select manager from jbemployee where jbemployee.manager is not null
+    -> union
+    -> select manager from jbdept where jbdept.manager is not null;
+Query OK, 12 rows affected (0.01 sec)
+Records: 12  Duplicates: 0  Warnings: 0
+
+mysql> alter table jbemployee drop foreign key fk_emp_mgr;
+Query OK, 0 rows affected (0.01 sec)
+Records: 0  Duplicates: 0  Warnings: 0
+
+mysql> alter table jbemployee add constraint fk_emp_mgr foreign key (manager) references jbmanager (id);
+Query OK, 25 rows affected (0.02 sec)
+Records: 25  Duplicates: 0  Warnings: 0
+
+mysql> alter table jbdept drop foreign key fk_dept_mgr;
+Query OK, 0 rows affected (0.01 sec)
+Records: 0  Duplicates: 0  Warnings: 0
+
+mysql> alter table jbdept add constraint fk_dept_mgr foreign key (manager) references jbmanager (id);
+Query OK, 19 rows affected (0.03 sec)
+Records: 19  Duplicates: 0  Warnings: 0
+
+
+The bonus value should have a default value of 0. If it were null, you could not add it with an existing salary unless the manager had a bonus. Example:
+
+mysql> select 100 + null;
++------------+
+| 100 + null |
++------------+
+|       NULL |
++------------+
+1 row in set (0.00 sec)
+
+mysql> update jbmanager
+    -> set bonus=bonus+10000
+    -> where id in (select manager from jbdept);
+Query OK, 11 rows affected (0.01 sec)
+Rows matched: 11  Changed: 11  Warnings: 0
+
+Uppg 4
+mysql> select * from jbmanager;
++-----+-------+
+| id  | bonus |
++-----+-------+
+|  10 | 10000 |
+|  13 | 10000 |
+|  26 | 10000 |
+|  32 | 10000 |
+|  33 | 10000 |
+|  35 | 10000 |
+|  37 | 10000 |
+|  55 | 10000 |
+|  98 | 10000 |
+| 129 | 10000 |
+| 157 | 10000 |
+| 199 |     0 |
++-----+-------+
+12 rows in set (0.00 sec)

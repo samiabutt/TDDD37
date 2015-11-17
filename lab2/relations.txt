@@ -1,0 +1,5 @@
+EMPLOYEE(Key,Startyear,Name,Birthyear,Salary,FK(ManagerKey))
+
+DEPT(Key,Name,Store,Floor,FK(Manager))
+
+MANAGER(Key,Bonus)
