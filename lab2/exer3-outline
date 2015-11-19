@@ -1,8 +1,0 @@
-- Create Manager table
-- Add all managers from jbemployee to the table
-- Add all managers from jbdept to the table
-
-- Modify the jbemployee relation to add a foreign key to Manager
-- Modify the jbdept relation to add a foreign key to Manager
-
-The bonus value needs to be initialized. If it were set to Null and you added it to the salary, it would give Null as a result. By setting the bonus to 0 we would not encounter this problem when calculating the salary for a manager that hasn't received any bonus.
