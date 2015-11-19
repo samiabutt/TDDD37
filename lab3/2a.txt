@@ -1,0 +1,9 @@
+1. A -> D
+2. D -> AE
+3. D -> A (decomposition)
+4. D -> E (decomposition)
+5. D -> F (transitive)
+5. DB -> C (pseudotransitive)
+6. DB -> E (augmentation + decomposition)
+7. DB -> A (augmentation + decomposition)
+8. DB -> ACEF (additive)

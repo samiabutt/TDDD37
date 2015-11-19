@@ -100,3 +100,6 @@ Records: 5  Duplicates: 0  Warnings: 0
 mysql> alter table jbdebit add constraint fk_debit_acc foreign key (account) references jbaccount (id);
 Query OK, 6 rows affected (0.03 sec)
 Records: 6  Duplicates: 0  Warnings: 0
+
+
+NOTE: We created a dummy customer entry (and account entries) so that we didn't need to delete any data from jbdebit.
