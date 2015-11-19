@@ -1,0 +1,56 @@
+Labb 3, simli746 and jonol209
+
+1 a) F = {AB -> CD, B -> C}
+     AB is primary key. It isn't 2NF since B is a part of a candidate key (AB) and B -> C. It is 1NF since all values are atomic.
+  
+  b) F = {A -> BCD, C -> D}
+  	 A is primary key. It is not 3NF since we have C -> D and C is not in a candidate key, and D is non-prime. It is 2NF since the relational model does not have any set of non-prime attributes that is functionanlly dependent on part of a candidate key.
+
+  c) F = {AB -> CD, C -> B}
+     AB is primary key. It is not BCNF since C is not in a candidate key and we have C -> B. It is 3NF as B is prime. 
+
+2.
+a) (1)  AB -> C
+   (2)  A -> D
+   (3)  D -> AE
+   (4)  E -> F
+   (5)  D -> A (decomposition)
+   (6)  D -> E (decomposition)
+   (7)  D -> F (transitive)
+   (8)  DB -> C (pseudotransitive)
+   (9)  DB -> E (augmentation (B with 6) + decomposition)
+   (10) DB -> A (augmentation (B with 5) + decomposition)
+   (11) DB -> F (augmentation (B with 7) + decomposition)
+   (11) DB -> ACEF (additive)
+
+b) We begin with: R={A, B, C, D, E, F} and CK=AB and DB
+   Decompose into:
+   		R={A, B, C, D} with CK=AB and BD 
+   		R2={D, E, F} with CK=D
+c) Decompose into:
+		R={A, B, C, D} with CK=AB and BD
+		R2={D, E} with CK=D
+		R3={E, F} with CK=E
+d) Decompose into:
+  		R={A, B, C} = with CK=AB
+  		R2={D, E} with CK=D
+		R3={E, F} with CK=E
+		R4={A, D} with CK=A and D
+
+3.
+a) We assume that it is 1NF (that every attribute is atomic).
+   However, it is not 2NF since Author -> AuthorName, Author is a part of a candidate key and AuthorName is non-prime.
+b) We begin with: R(Title#, Title, Author#, BookType, Price, AuthorName, Publisher) with CK=Title#,Author#
+   Now, we decompose into 2NF:
+   		R(Title#, Author#) with CK=Title#,Author#
+   		R2(Author#, AuthorName) with CK=Author#
+   		R3(Title#, Title, BookType, Price, Publisher) with CK=Title#
+
+   Decompose into 3NF:
+   		R(Title#, Author#) with CK=Title#,Author#
+   		R2(Author#, AuthorName) with CK=Author#
+   		R3(Title#, Title, BookType, Publisher) with CK=Title#
+   		R4(BookType, Price) with CK=BookType
+
+   	This is also BCNF
+
