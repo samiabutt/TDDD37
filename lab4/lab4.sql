@@ -1,3 +1,29 @@
+SET FOREIGN_KEY_CHECKS=0;
+
+DROP TABLE IF EXISTS `passenger`;
+DROP TABLE IF EXISTS `contact`;
+DROP TABLE IF EXISTS `year`;
+DROP TABLE IF EXISTS `weekday`;
+DROP TABLE IF EXISTS `airport`;
+DROP TABLE IF EXISTS `route`;
+DROP TABLE IF EXISTS `weekly_schedule`;
+DROP TABLE IF EXISTS `flight`;
+DROP TABLE IF EXISTS `credit_card`;
+DROP TABLE IF EXISTS `reservation`;
+DROP TABLE IF EXISTS `booking`;
+DROP TABLE IF EXISTS `contact_responsible`;
+DROP TABLE IF EXISTS `passenger_ticket`;
+DROP TABLE IF EXISTS `reserved_on`;
+
+DROP PROCEDURE IF EXISTS `addYear`;
+DROP PROCEDURE IF EXISTS `addDay`;
+DROP PROCEDURE IF EXISTS `addDestination`;
+DROP PROCEDURE IF EXISTS `addRoute`;
+DROP PROCEDURE IF EXISTS `addFlight`;
+#DROP PROCEDURE IF EXISTS ``;
+
+SET FOREIGN_KEY_CHECKS=1;
+
 CREATE TABLE `passenger` (
   `passport_number` INT NOT NULL,
   `name` VARCHAR(30),
@@ -209,21 +235,20 @@ END //
 
 
 CREATE PROCEDURE addFlight(IN departure_airport_code VARCHAR(3), IN arrival_airport_code VARCHAR(30),
-IN year INT, IN day VARCHAR(10), IN departure_time)
+IN year INT, IN day VARCHAR(10), IN departure_time TIME)
 BEGIN
 	INSERT INTO weekly_schedule (departure_time, year, weekday, departure, arrival) 
 	VALUES(departure_time, year, day, departure_airport_code, arrival_airport_code);
 	SET @last_id = LAST_INSERT_ID();
-	DECLARE p1 INT DEFAULT 0;
+	SET @p1 = 0;
 	WHILE p1 < 52 DO
-	    SET p1 = p1 + 1;
+	    SET @p1 = @p1 + 1;
 	    INSERT INTO flight (week, weekly_flight) 
-		VALUES(p1, @last_id);
+		VALUES(@p1, @last_id);
 	END WHILE;
 END //
 
 
 
-#year i route?
 
 delimiter ;
