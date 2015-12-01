@@ -88,7 +88,7 @@ CREATE TABLE `weekly_schedule` (
 );
 
 CREATE TABLE `flight` (
-  `flight_number` INT NOT NULL,
+  `flight_number` INT NOT NULL AUTO_INCREMENT,
   `week` INT NOT NULL,
   `weekly_flight` INT NOT NULL,
   PRIMARY KEY `pk_flight_number`(`flight_number`),
@@ -182,3 +182,48 @@ CREATE TABLE `reserved_on` (
     ON DELETE NO ACTION
     ON UPDATE CASCADE
 );
+
+
+delimiter //
+
+CREATE PROCEDURE addYear (IN year INT, IN factor DOUBLE)
+BEGIN
+	INSERT INTO year VALUES(year, factor);
+END //
+
+CREATE PROCEDURE addDay(IN year INT, IN day VARCHAR(10), IN factor DOUBLE)
+BEGIN
+	INSERT INTO weekDay VALUES(day, year, factor);
+END //
+
+CREATE PROCEDURE addDestination(IN airport_code VARCHAR(3), IN name VARCHAR(30), IN country VARCHAR(30))
+BEGIN
+	INSERT INTO airport (airport_code, airport_name, country) VALUES(airport_code, name, country);
+END //
+
+CREATE PROCEDURE addRoute(IN departure_airport_code VARCHAR(3), IN arrival_airport_code VARCHAR(30),
+	IN year INT, IN routeprice DOUBLE)
+BEGIN
+	INSERT INTO route VALUES(departure_airport_code, arrival_airport_code, routeprice);
+END //
+
+
+CREATE PROCEDURE addFlight(IN departure_airport_code VARCHAR(3), IN arrival_airport_code VARCHAR(30),
+IN year INT, IN day VARCHAR(10), IN departure_time)
+BEGIN
+	INSERT INTO weekly_schedule (departure_time, year, weekday, departure, arrival) 
+	VALUES(departure_time, year, day, departure_airport_code, arrival_airport_code);
+	SET @last_id = LAST_INSERT_ID();
+	DECLARE p1 INT DEFAULT 0;
+	WHILE p1 < 52 DO
+	    SET p1 = p1 + 1;
+	    INSERT INTO flight (week, weekly_flight) 
+		VALUES(p1, @last_id);
+	END WHILE;
+END //
+
+
+
+#year i route?
+
+delimiter ;
