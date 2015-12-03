@@ -20,7 +20,10 @@ DROP PROCEDURE IF EXISTS `addDay`;
 DROP PROCEDURE IF EXISTS `addDestination`;
 DROP PROCEDURE IF EXISTS `addRoute`;
 DROP PROCEDURE IF EXISTS `addFlight`;
-#DROP PROCEDURE IF EXISTS ``;
+
+DROP FUNCTION IF EXISTS `calculateFreeSeats`;
+DROP FUNCTION IF EXISTS `calculatePrice`;
+DROP FUNCTION IF EXISTS `calculateBookedSeats`;
 
 SET FOREIGN_KEY_CHECKS=1;
 
@@ -38,7 +41,7 @@ CREATE TABLE `contact` (
   CONSTRAINT `fk_contact_passenger`
     FOREIGN KEY (`passport_number`)
     REFERENCES `passenger` (`passport_number`)
-    ON DELETE NO ACTION
+    ON DELETE CASCADE
     ON UPDATE CASCADE
 );
 
@@ -70,15 +73,21 @@ CREATE TABLE `route` (
   `departure` VARCHAR(3) NOT NULL,
   `arrival` VARCHAR(3) NOT NULL,
   `price` DOUBLE,
-  PRIMARY KEY `pk_dep_arr`(`departure`, `arrival`),
+  `year` INT NOT NULL,
+  PRIMARY KEY `pk_dep_arr`(`departure`, `arrival`, `year`),
   CONSTRAINT `fk_route_airport`
     FOREIGN KEY (`departure`)
     REFERENCES `airport` (`airport_code`)
-    ON DELETE NO ACTION
+    ON DELETE CASCADE
     ON UPDATE CASCADE,
   CONSTRAINT `fk_airport_airport`
     FOREIGN KEY (`arrival`)
     REFERENCES `airport` (`airport_code`)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+  CONSTRAINT `fk_route_year`
+    FOREIGN KEY (`year`)
+    REFERENCES `year` (`year`)
     ON DELETE NO ACTION
     ON UPDATE CASCADE
 );
@@ -90,25 +99,31 @@ CREATE TABLE `weekly_schedule` (
   `weekday` VARCHAR(10) NOT NULL,
   `departure` VARCHAR(3) NOT NULL,
   `arrival` VARCHAR(3) NOT NULL,
+  `route_year` INT NOT NULL,
   PRIMARY KEY `pk_id`(`id`),
   CONSTRAINT `fk_weekday_sched_weekday`
     FOREIGN KEY (`year`)
     REFERENCES `weekday` (`year`)
-    ON DELETE NO ACTION
+    ON DELETE CASCADE
     ON UPDATE CASCADE,
   CONSTRAINT `fk_weekday_weekday`
     FOREIGN KEY (`weekday`)
     REFERENCES `weekday` (`name`)
-    ON DELETE NO ACTION
+    ON DELETE CASCADE
     ON UPDATE CASCADE,
   CONSTRAINT `fk_weekday_1_route`
     FOREIGN KEY (`departure`)
     REFERENCES `route` (`departure`)
-    ON DELETE NO ACTION
+    ON DELETE CASCADE
     ON UPDATE CASCADE,
   CONSTRAINT `fk_weekday_2_route`
     FOREIGN KEY (`arrival`)
     REFERENCES `route` (`arrival`)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+  CONSTRAINT `fk_weekly_schedule_year`
+    FOREIGN KEY (`route_year`)
+    REFERENCES `route` (`year`)
     ON DELETE NO ACTION
     ON UPDATE CASCADE
 );
@@ -121,7 +136,7 @@ CREATE TABLE `flight` (
   CONSTRAINT `fk_flight_weekly_schedule`
     FOREIGN KEY (`weekly_flight`)
     REFERENCES `weekly_schedule` (`id`)
-    ON DELETE NO ACTION
+    ON DELETE CASCADE
     ON UPDATE CASCADE
 );
 
@@ -139,7 +154,7 @@ CREATE TABLE `reservation` (
   CONSTRAINT `fk_reservation_flight`
     FOREIGN KEY (`flight`)
     REFERENCES `flight` (`flight_number`)
-    ON DELETE NO ACTION
+    ON DELETE CASCADE
     ON UPDATE CASCADE
 );
 
@@ -151,12 +166,12 @@ CREATE TABLE `booking` (
   CONSTRAINT `fk_booking_reservation`
     FOREIGN KEY (`reservation_number`)
     REFERENCES `reservation` (`reservation_number`)
-    ON DELETE NO ACTION
+    ON DELETE CASCADE
     ON UPDATE CASCADE,
   CONSTRAINT `fk_booking_credit_card`
     FOREIGN KEY (`credit_card`)
     REFERENCES `credit_card` (`ccn`)
-    ON DELETE NO ACTION
+    ON DELETE CASCADE
     ON UPDATE CASCADE
 );
 
@@ -167,29 +182,29 @@ CREATE TABLE `contact_responsible` (
   CONSTRAINT `fk_cr_contact`
     FOREIGN KEY (`contact`)
     REFERENCES `contact` (`passport_number`)
-    ON DELETE NO ACTION
+    ON DELETE CASCADE
     ON UPDATE CASCADE,
   CONSTRAINT `fk_cr_reservation`
     FOREIGN KEY (`reservation`)
     REFERENCES `reservation` (`reservation_number`)
-    ON DELETE NO ACTION
+    ON DELETE CASCADE
     ON UPDATE CASCADE
 );
 
 CREATE TABLE `passenger_ticket` (
   `passenger` INT NOT NULL,
   `booking` INT NOT NULL,
-  `ticket_no` INT NOT NULL,
+  `ticket_no` INT,
   PRIMARY KEY `pk_passenger_booking`(`passenger`, `booking`),
   CONSTRAINT `fk_pt_passenger`
     FOREIGN KEY (`passenger`)
     REFERENCES `passenger` (`passport_number`)
-    ON DELETE NO ACTION
+    ON DELETE CASCADE
     ON UPDATE CASCADE,
   CONSTRAINT `fk_pt_booking`
     FOREIGN KEY (`booking`)
     REFERENCES `booking` (`reservation_number`)
-    ON DELETE NO ACTION
+    ON DELETE CASCADE
     ON UPDATE CASCADE
 );
 
@@ -200,12 +215,12 @@ CREATE TABLE `reserved_on` (
   CONSTRAINT `fk_ro_passenger`
     FOREIGN KEY (`passenger`)
     REFERENCES `passenger` (`passport_number`)
-    ON DELETE NO ACTION
+    ON DELETE CASCADE
     ON UPDATE CASCADE,
   CONSTRAINT `fk_ro_reservation`
     FOREIGN KEY (`reservation`)
     REFERENCES `reservation` (`reservation_number`)
-    ON DELETE NO ACTION
+    ON DELETE CASCADE
     ON UPDATE CASCADE
 );
 
@@ -230,25 +245,63 @@ END //
 CREATE PROCEDURE addRoute(IN departure_airport_code VARCHAR(3), IN arrival_airport_code VARCHAR(30),
 	IN year INT, IN routeprice DOUBLE)
 BEGIN
-	INSERT INTO route VALUES(departure_airport_code, arrival_airport_code, routeprice);
+	INSERT INTO route (departure, arrival, price, year) VALUES(departure_airport_code, arrival_airport_code, routeprice, year);
 END //
 
 
 CREATE PROCEDURE addFlight(IN departure_airport_code VARCHAR(3), IN arrival_airport_code VARCHAR(30),
 IN year INT, IN day VARCHAR(10), IN departure_time TIME)
 BEGIN
-	INSERT INTO weekly_schedule (departure_time, year, weekday, departure, arrival) 
-	VALUES(departure_time, year, day, departure_airport_code, arrival_airport_code);
+	INSERT INTO weekly_schedule (departure_time, year, weekday, departure, arrival, route_year) 
+	VALUES(departure_time, year, day, departure_airport_code, arrival_airport_code, year);
 	SET @last_id = LAST_INSERT_ID();
 	SET @p1 = 0;
-	WHILE p1 < 52 DO
+	WHILE @p1 < 52 DO
 	    SET @p1 = @p1 + 1;
 	    INSERT INTO flight (week, weekly_flight) 
 		VALUES(@p1, @last_id);
 	END WHILE;
 END //
 
+CREATE FUNCTION `calculateBookedSeats`(`flightnumber` INT) RETURNS INT
+BEGIN
+  RETURN (SELECT COUNT(*) FROM `flight` f 
+    JOIN `reservation` r ON f.flight_number = r.flight 
+    JOIN `booking` b ON b.reservation_number = r.reservation_number);
+END //
 
+CREATE FUNCTION `calculateFreeSeats`(`flightnumber` INT) RETURNS INT
+BEGIN
+  RETURN 40 - calculateBookedSeats(flightnumber);
+END //
+
+CREATE FUNCTION `calculatePrice`(`flightnumber` INT) RETURNS DOUBLE
+BEGIN
+  SET @route_price = (SELECT r.price FROM flight f
+           JOIN weekly_schedule ws ON f.weekly_flight = ws.id 
+           JOIN route r ON (r.arrival = ws.arrival AND r.departure = ws.departure AND r.year = ws.route_year)
+           WHERE f.flight_number = flightnumber);
+  SET @profit_factor = 1;
+  SET @weekday_factor = 1;
+
+  SELECT w.pricing_factor, y.profit_factor INTO @weekday_factor, @profit_factor FROM flight f 
+    JOIN weekly_schedule ws ON f.weekly_flight = ws.id 
+    JOIN weekday w ON w.name = ws.weekday 
+    JOIN year y ON w.year = y.year
+    WHERE f.flight_number = flightnumber;
+
+  set @booked_factor = (SELECT calculateBookedSeats(flightnumber)+1)/40;
+  RETURN (@route_price * @profit_factor * @weekday_factor * @booked_factor);
+END //
+
+CREATE TRIGGER `unique_ticket_number` AFTER INSERT ON `passenger_ticket` FOR EACH ROW
+BEGIN
+	UPDATE `passenger_ticket` pt
+	  SET pt.ticket_no = floor( 256203221 + (RAND() * 256203221))
+	  WHERE pt.passenger = NEW.passenger and pt.booking = NEW.booking;
+END //
 
 
 delimiter ;
+
+source q3.sql;
