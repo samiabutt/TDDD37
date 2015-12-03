@@ -23,11 +23,14 @@ DROP PROCEDURE IF EXISTS `addFlight`;
 DROP PROCEDURE IF EXISTS `addReservation`;
 DROP PROCEDURE IF EXISTS `addPassenger`;
 DROP PROCEDURE IF EXISTS `addContact`;
+DROP PROCEDURE IF EXISTS `addPayment`;
 
 DROP FUNCTION IF EXISTS `calculateFreeSeats`;
 DROP FUNCTION IF EXISTS `calculatePrice`;
 DROP FUNCTION IF EXISTS `reservationExists`;
 DROP FUNCTION IF EXISTS `calculateBookedSeats`;
+
+DROP VIEW IF EXISTS `allFlights`;
 
 SET FOREIGN_KEY_CHECKS=1;
 
@@ -243,7 +246,7 @@ END //
 
 CREATE PROCEDURE addDestination(IN airport_code VARCHAR(3), IN name VARCHAR(30), IN country VARCHAR(30))
 BEGIN
-	INSERT INTO airport (airport_code, airport_name, country) VALUES(airport_code, name, country);
+	INSERT INTO airport (airport_code, city_name, country) VALUES(airport_code, name, country);
 END //
 
 CREATE PROCEDURE addRoute(IN departure_airport_code VARCHAR(3), IN arrival_airport_code VARCHAR(30),
@@ -271,7 +274,9 @@ CREATE FUNCTION `calculateBookedSeats`(`flightnumber` INT) RETURNS INT
 BEGIN
   RETURN (SELECT COUNT(*) FROM `flight` f 
     JOIN `reservation` r ON f.flight_number = r.flight 
-    JOIN `booking` b ON b.reservation_number = r.reservation_number);
+    JOIN `booking` b ON b.reservation_number = r.reservation_number
+    JOIN `passenger_ticket` pt on b.reservation_number = pt.booking
+    WHERE flightnumber = f.flight_number);
 END //
 
 CREATE FUNCTION `calculateFreeSeats`(`flightnumber` INT) RETURNS INT
@@ -298,11 +303,9 @@ BEGIN
   RETURN (@route_price * @profit_factor * @weekday_factor * @booked_factor);
 END //
 
-CREATE TRIGGER `unique_ticket_number` AFTER INSERT ON `passenger_ticket` FOR EACH ROW
+CREATE TRIGGER `unique_ticket_number` BEFORE INSERT ON `passenger_ticket` FOR EACH ROW
 BEGIN
-	UPDATE `passenger_ticket` pt
-	  SET pt.ticket_no = floor( 256203221 + (RAND() * 256203221))
-	  WHERE pt.passenger = NEW.passenger and pt.booking = NEW.booking;
+    SET NEW.ticket_no = floor( 256203221 + (RAND() * 256203221));
 END //
 
 CREATE FUNCTION reservationExists(reservation_nr INT) RETURNS BOOLEAN
@@ -325,7 +328,8 @@ BEGIN
         AND w.year = year 
         AND w.weekday = day 
         AND w.departure_time = time 
-        AND f.week = week);
+        AND f.week = week
+        LIMIT 1);
 
     IF @flight_number is NULL THEN
     	SIGNAL SQLSTATE '42000' SET MESSAGE_TEXT = 'There exist no flight for the given route, date and time.';
@@ -349,6 +353,10 @@ BEGIN
     INSERT INTO passenger VALUES(passport_number, name);
   END IF;
 
+  IF (EXISTS(SELECT * FROM booking WHERE reservation_number=reservation_nr)) THEN
+    SIGNAL SQLSTATE '42005' SET MESSAGE_TEXT = 'The booking has already been payed and no further passengers can be added.';
+  END IF;
+
   INSERT INTO reserved_on VALUES(passport_number, reservation_nr);
 END //
 
@@ -363,6 +371,50 @@ BEGIN
     SIGNAL SQLSTATE '42002' SET MESSAGE_TEXT = 'The person is not a passenger of the reservation.';
   END IF;
 
+  INSERT INTO contact VALUES(@passenger, email, phone)
+    ON DUPLICATE KEY UPDATE contact.email=email, contact.phone_number=phone;
+
+  INSERT INTO contact_responsible VALUES(passport_number, reservation_nr);
 END //
 
+CREATE PROCEDURE addPayment(IN reservation_nr INT, IN cardholder_name VARCHAR(30), IN credit_card_number BIGINT)
+BEGIN
+  set @tmp = reservationExists(reservation_nr);
+
+  set @flight_number = (SELECT flight FROM reservation WHERE reservation_number=reservation_nr);
+
+  SET @res_count = (SELECT COUNT(*) FROM reservation r JOIN reserved_on ro ON r.reservation_number=ro.reservation);
+  IF calculateFreeSeats(@flight_number) < @res_count THEN
+    DELETE FROM reservation WHERE reservation_number=reservation_nr;
+    SIGNAL SQLSTATE '42003' SET MESSAGE_TEXT = 'There are not enough seats available on the flight anymore, deleting reservation.';
+  END IF;
+
+  IF (NOT EXISTS(SELECT * FROM contact_responsible cr WHERE cr.reservation=reservation_nr)) THEN
+    SIGNAL SQLSTATE '42004' SET MESSAGE_TEXT = 'The reservation has no contact yet.';
+  END IF;
+
+
+  INSERT INTO credit_card VALUES(credit_card_number, cardholder_name);
+  INSERT INTO booking VALUES(reservation_nr, calculatePrice(@flight_number), credit_card_number);
+  INSERT INTO passenger_ticket (booking, passenger) 
+    (SELECT reservation_nr, passport_number FROM reserved_on ro
+      JOIN passenger p ON (p.passport_number = ro.passenger) 
+    WHERE ro.reservation = reservation_nr);
+
+END //
+
+
 delimiter ;
+
+CREATE VIEW allFlights AS 
+  SELECT ad.city_name departure_city_name, aa.city_name destination_city_name, ws.departure_time departure_time,
+  ws.weekday departure_day, f.week departure_week, ws.year departure_year, 
+  calculateFreeSeats(f.flight_number) nr_of_free_seats, calculatePrice(f.flight_number) current_price_per_seat
+
+  FROM weekly_schedule ws 
+    JOIN flight f ON f.weekly_flight = ws.id
+    JOIN route r ON (r.departure = ws.departure AND r.arrival = ws.arrival AND r.year = ws.route_year)
+    JOIN airport aa ON (aa.airport_code = r.arrival)
+    JOIN airport ad ON (ad.airport_code = r.departure);
+
+
