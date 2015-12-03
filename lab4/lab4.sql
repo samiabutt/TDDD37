@@ -299,8 +299,7 @@ BEGIN
     JOIN year y ON w.year = y.year
     WHERE f.flight_number = flightnumber;
 
-  set @booked_factor = (SELECT calculateBookedSeats(flightnumber)+1)/40;
-  RETURN (@route_price * @profit_factor * @weekday_factor * @booked_factor);
+  RETURN ROUND((@route_price * @profit_factor * @weekday_factor * (calculateBookedSeats(flightnumber)+1)/40), 13);
 END //
 
 CREATE TRIGGER `unique_ticket_number` BEFORE INSERT ON `passenger_ticket` FOR EACH ROW
@@ -379,12 +378,15 @@ END //
 
 CREATE PROCEDURE addPayment(IN reservation_nr INT, IN cardholder_name VARCHAR(30), IN credit_card_number BIGINT)
 BEGIN
+  DECLARE flight_number INT DEFAULT 0;
+  DECLARE res_count INT DEFAULT 0;
+
   set @tmp = reservationExists(reservation_nr);
 
-  set @flight_number = (SELECT flight FROM reservation WHERE reservation_number=reservation_nr);
+  SET flight_number = (SELECT flight FROM reservation WHERE reservation_number=reservation_nr);
 
-  SET @res_count = (SELECT COUNT(*) FROM reservation r JOIN reserved_on ro ON r.reservation_number=ro.reservation);
-  IF calculateFreeSeats(@flight_number) < @res_count THEN
+  SET res_count = (SELECT COUNT(*) FROM reservation r JOIN reserved_on ro ON r.reservation_number=ro.reservation);
+  IF calculateFreeSeats(flight_number) < @res_count THEN
     DELETE FROM reservation WHERE reservation_number=reservation_nr;
     SIGNAL SQLSTATE '42003' SET MESSAGE_TEXT = 'There are not enough seats available on the flight anymore, deleting reservation.';
   END IF;
@@ -395,7 +397,7 @@ BEGIN
 
 
   INSERT INTO credit_card VALUES(credit_card_number, cardholder_name);
-  INSERT INTO booking VALUES(reservation_nr, calculatePrice(@flight_number), credit_card_number);
+  INSERT INTO booking VALUES(reservation_nr, calculatePrice(flight_number), credit_card_number);
   INSERT INTO passenger_ticket (booking, passenger) 
     (SELECT reservation_nr, passport_number FROM reserved_on ro
       JOIN passenger p ON (p.passport_number = ro.passenger) 
