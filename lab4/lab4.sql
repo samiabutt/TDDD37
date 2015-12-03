@@ -20,9 +20,13 @@ DROP PROCEDURE IF EXISTS `addDay`;
 DROP PROCEDURE IF EXISTS `addDestination`;
 DROP PROCEDURE IF EXISTS `addRoute`;
 DROP PROCEDURE IF EXISTS `addFlight`;
+DROP PROCEDURE IF EXISTS `addReservation`;
+DROP PROCEDURE IF EXISTS `addPassenger`;
+DROP PROCEDURE IF EXISTS `addContact`;
 
 DROP FUNCTION IF EXISTS `calculateFreeSeats`;
 DROP FUNCTION IF EXISTS `calculatePrice`;
+DROP FUNCTION IF EXISTS `reservationExists`;
 DROP FUNCTION IF EXISTS `calculateBookedSeats`;
 
 SET FOREIGN_KEY_CHECKS=1;
@@ -147,7 +151,7 @@ CREATE TABLE `credit_card` (
 );
 
 CREATE TABLE `reservation` (
-  `reservation_number` INT NOT NULL,
+  `reservation_number` INT NOT NULL AUTO_INCREMENT,
   `num_seats_reserved` INT NOT NULL,
   `flight` INT NOT NULL,
   PRIMARY KEY `pk_reservation_number`(`reservation_number`),
@@ -234,7 +238,7 @@ END //
 
 CREATE PROCEDURE addDay(IN year INT, IN day VARCHAR(10), IN factor DOUBLE)
 BEGIN
-	INSERT INTO weekDay VALUES(day, year, factor);
+	INSERT INTO weekday VALUES(day, year, factor);
 END //
 
 CREATE PROCEDURE addDestination(IN airport_code VARCHAR(3), IN name VARCHAR(30), IN country VARCHAR(30))
@@ -301,7 +305,64 @@ BEGIN
 	  WHERE pt.passenger = NEW.passenger and pt.booking = NEW.booking;
 END //
 
+CREATE FUNCTION reservationExists(reservation_nr INT) RETURNS BOOLEAN
+BEGIN
+  SET @res = (SELECT reservation_number FROM reservation WHERE reservation_number = reservation_nr);
+
+  IF @res is NULL THEN
+    SIGNAL SQLSTATE '42002' SET MESSAGE_TEXT = 'The given reservation number does not exist.';
+  END IF;
+
+  RETURN 1;
+END //
+
+CREATE PROCEDURE addReservation(IN departure_airport_code VARCHAR(3), IN arrival_airport_code VARCHAR(30), IN year INT, IN week INT, IN day VARCHAR(10), IN time TIME, IN number_of_passengers INT, OUT reservation_number INT)
+BEGIN
+    SET @flight_number = (SELECT f.flight_number FROM weekly_schedule w
+      JOIN flight f ON f.weekly_flight = w.id
+      WHERE w.departure = departure_airport_code 
+        AND w.arrival = arrival_airport_code 
+        AND w.year = year 
+        AND w.weekday = day 
+        AND w.departure_time = time 
+        AND f.week = week);
+
+    IF @flight_number is NULL THEN
+    	SIGNAL SQLSTATE '42000' SET MESSAGE_TEXT = 'There exist no flight for the given route, date and time.';
+    END IF;
+
+    IF calculateFreeSeats(@flight_number) < number_of_passengers THEN
+    	SIGNAL SQLSTATE '42001' SET MESSAGE_TEXT = 'There are not enough seats available on the chosen flight.';
+    END IF;
+
+    INSERT INTO reservation (num_seats_reserved, flight) VALUES (number_of_passengers, @flight_number);
+    set reservation_number = LAST_INSERT_ID();
+END //
+
+CREATE PROCEDURE addPassenger(IN reservation_nr INT, IN passport_number INT, IN name VARCHAR(30))
+BEGIN
+  set @tmp = reservationExists(reservation_nr);
+
+  SET @passenger = (SELECT p.passport_number FROM passenger p WHERE p.passport_number = passport_number);
+
+  IF @passenger is NULL THEN
+    INSERT INTO passenger VALUES(passport_number, name);
+  END IF;
+
+  INSERT INTO reserved_on VALUES(passport_number, reservation_nr);
+END //
+
+/*addContact(reservation_nr, passport_number, email, phone);*/
+
+CREATE PROCEDURE addContact(IN reservation_nr INT, IN passport_number INT, IN email VARCHAR(30), IN phone BIGINT)
+BEGIN
+  set @tmp = reservationExists(reservation_nr);
+
+  SET @passenger = (SELECT ro.passenger FROM reserved_on ro WHERE ro.passenger = passport_number AND ro.reservation = reservation_nr);
+  IF @passenger is NULL THEN
+    SIGNAL SQLSTATE '42002' SET MESSAGE_TEXT = 'The person is not a passenger of the reservation.';
+  END IF;
+
+END //
 
 delimiter ;
-
-source q3.sql;
