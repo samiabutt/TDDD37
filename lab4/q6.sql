@@ -41,7 +41,7 @@ CALL addReservation("MIT","HOB",2010,1,"Monday","09:00:00",3,@a);
 SELECT "Check that the reservation number is returned properly (any number will do):" AS "Message",@a AS "Res. number returned"; 
 
 SELECT "Test 2: Adding a reservation with incorrect flightdetails. Expected answer: There exist no flight for the given route, date and time" as "Message";
-CALL addReservation("MIT","HOB",2010,1,"Monday","21:00:00",3,@b); 
+CALL addReservation("MIT","HOB",2010,1,"Monday","22:00:00",3,@b); 
 
 SELECT "Test 3: Adding a reservation when there are not enough seats. Expected answer: There are not enough seats available on the chosen flight" as "Message";
 CALL addReservation("MIT","HOB",2010,1,"Monday","09:00:00",61,@c); 

@@ -1,0 +1,70 @@
+9.
+
+
+START TRANSACTION;
+CALL addReservation("MIT","HOB",2010,1,"Monday","09:00:00",3,@a); //Locks table
+COMMIT;
+
+
+START TRANSACTION;
+update reservation set flight=2; // table is locked
+COMMIT;
+
+
+
+
+
+10 a)
+
+No! Before adding a payment the procedure checks so that there are enough unpaid seats left on the flight.
+
+b) 
+
+
+0 /* Procedure that pays for a reservation */
+CREATE PROCEDURE addPayment(IN reservation_nr INT, IN cardholder_name VARCHAR(30), IN credit_card_number BIGINT)
+BEGIN
+    DECLARE flight_number INT;
+    DECLARE res_count INT;
+
+    /* Check so that the reservation exists. This procedure call will give an error otherwise */
+    IF (NOT EXISTS(SELECT reservation_number FROM reservation WHERE reservation_number = reservation_nr)) THEN
+        SIGNAL SQLSTATE '42002' SET MESSAGE_TEXT = 'The given reservation number does not exist.';
+    END IF;
+
+    /* Get the flight number and number of seats for the reservation. */
+    SELECT flight INTO flight_number FROM reservation WHERE reservation_number=reservation_nr;
+    SELECT COUNT(*) INTO res_count FROM reservation r JOIN reserved_on ro ON r.reservation_number=ro.reservation
+        WHERE r.reservation_number = reservation_nr;
+
+    /* Check so that there is enough reserved seats */
+    IF calculateFreeSeats(flight_number) < res_count THEN
+        DELETE FROM reservation WHERE reservation_number=reservation_nr;
+        SIGNAL SQLSTATE '42003' SET MESSAGE_TEXT = 'There are not enough seats available on the flight anymore, deleting reservation.';
+    END IF;
+
+    /* The reservation must have a contact for it to be payable */
+    IF (NOT EXISTS(SELECT * FROM contact_responsible cr WHERE cr.reservation=reservation_nr)) THEN
+        SIGNAL SQLSTATE '42004' SET MESSAGE_TEXT = 'The reservation has no contact yet.';
+    END IF;
+
+    /* Everything is OK. Insert the values */
+    INSERT INTO credit_card VALUES(credit_card_number, cardholder_name);
+    INSERT INTO booking VALUES(reservation_nr, calculatePrice(flight_number), credit_card_number);
+    INSERT INTO passenger_ticket (booking, passenger) 
+        (SELECT reservation_nr, passport_number FROM reserved_on ro
+            JOIN passenger p ON (p.passport_number = ro.passenger) 
+        WHERE ro.reservation = reservation_nr);
+END //
+
+
+If both are done with line 41 (calculateFreeSeats < count reserved) before any completes the inserts from line 52 we will get an overbooking. Otherwise the check at line 41 will make sure no overbooking occurs.
+
+This is "lost update".
+
+
+10 c)
+	
+At line 52:
+    SELECT sleep(5);
+
