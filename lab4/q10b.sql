@@ -1,7 +1,7 @@
 /******************************************************************************************
  Question 10, concurrency
  This is the second of two scripts that tests that the BryanAir database can handle concurrency.
- This script sets up a valid reserva0tion and tries to pay for it in such a way that at most 
+ This script sets up a valid reservation and tries to pay for it in such a way that at most 
  one such booking should be possible (or the plane will run out of seats). This script should 
  be run in both terminals, in parallel. 
 **********************************************************************************************/
@@ -35,43 +35,24 @@ SELECT SLEEP(2);
 SELECT nr_of_free_seats from allFlights where departure_week = 1;
 SELECT "Making payment, supposed to work for one session and be denied for the other" as "Message";
 
-/*
-DELIMITER //
-
-DROP PROCEDURE IF EXISTS `testAddPayment`;
-CREATE PROCEDURE testAddPayment()
-BEGIN
-	START TRANSACTION;
-	CALL addPayment (@a, "Sauron",7878787878);
-	COMMIT;
-	set @free_seats = 0;
-	SELECT calculateFreeSeats(r.flight) INTO @free_seats FROM reservation r WHERE r.reservation_number=@a;
-	select @free_seats;
-
-	IF @free_seats < 0 THEN
-		ROLLBACK;
-	END IF;
-END //
-
-DELIMITER ;
-
-CALL testAddPayment();
-*/
-/*START TRANSACTION;*/
-LOCK TABLES year READ, weekday w READ, weekly_schedule ws READ, route r READ, reservation res READ, booking WRITE, reserved_on ro READ, contact_responsible cr READ, credit_card WRITE, passenger_ticket WRITE, passenger p READ, flight READ, reservation WRITE, allFlights READ;
+LOCK TABLES booking b READ, 
+			booking WRITE, 
+			contact_responsible cr READ, 
+			credit_card WRITE, 
+			flight f READ,
+			flight READ, 
+			passenger p READ, 
+			passenger_ticket WRITE, 
+			reservation res READ, 
+			reservation WRITE, 
+			reserved_on ro READ, 
+			route r READ, 
+			weekday w READ, 
+			weekly_schedule ws READ,
+			year READ;
 CALL addPayment (@a, "Sauron",7878787878);
 UNLOCK TABLES;
 
-/*set @free_seats = 0;
-
-SELECT calculateFreeSeats(r.flight) INTO @free_seats FROM reservation r WHERE r.reservation_number=@a;
-select @free_seats;
-IF -2 = 0 THEN
-	ROLLBACK;
-END IF;
-COMMIT;*/
 SELECT "Nr of free seats on the flight (should be 19 if no overbooking occured, otherwise -2): " as "Message", (SELECT nr_of_free_seats from allFlights where departure_week = 1) as "nr_of_free_seats";
-
-  
 
 

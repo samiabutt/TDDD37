@@ -306,48 +306,48 @@ BEGIN
 END //
 
 
-CREATE FUNCTION `calculateBookedSeats`(`flightnumber` INT) RETURNS INT
+CREATE FUNCTION calculateBookedSeats(flightnumber INT) RETURNS INT
 BEGIN
     /* The number of booked seats in a flight is equal to the number of ticket numbers
     that corresponds to a the flight number */
     RETURN (SELECT COUNT(*) FROM flight 
-                JOIN `reservation` res ON flight.flight_number = res.flight 
-                JOIN booking ON booking.reservation_number = res.reservation_number
-                JOIN passenger_ticket on booking.reservation_number = passenger_ticket.booking
+                JOIN reservation res ON flight.flight_number = res.flight 
+                JOIN booking b ON b.reservation_number = res.reservation_number
+                JOIN passenger_ticket on b.reservation_number = passenger_ticket.booking
                 WHERE flightnumber = flight.flight_number);
 END //
 
 
-CREATE FUNCTION `calculateFreeSeats`(`flightnumber` INT) RETURNS INT
+CREATE FUNCTION calculateFreeSeats(flightnumber INT) RETURNS INT
 BEGIN
     /* There is 40 places on a plane. The number of free seats is therefor 40 - the booked ones. */
     RETURN 40 - calculateBookedSeats(flightnumber);
 END //
 
 
-CREATE FUNCTION `calculatePrice`(`flightnumber` INT) RETURNS DOUBLE
+CREATE FUNCTION calculatePrice(flightnumber INT) RETURNS DOUBLE
 BEGIN
     DECLARE route_price DOUBLE;
     DECLARE profit_factor DOUBLE;
     DECLARE weekday_factor DOUBLE;
 
-    SELECT r.price INTO route_price FROM flight
-           JOIN weekly_schedule ws ON flight.weekly_flight = ws.id 
+    SELECT r.price INTO route_price FROM flight f
+           JOIN weekly_schedule ws ON f.weekly_flight = ws.id 
            JOIN route r ON (r.arrival = ws.arrival AND r.departure = ws.departure AND r.year = ws.route_year)
-           WHERE flight.flight_number = flightnumber;
+           WHERE f.flight_number = flightnumber;
 
-    SELECT w.pricing_factor, year.profit_factor INTO weekday_factor, profit_factor FROM flight 
-        JOIN weekly_schedule ws ON flight.weekly_flight = ws.id 
+    SELECT w.pricing_factor, year.profit_factor INTO weekday_factor, profit_factor FROM flight  f
+        JOIN weekly_schedule ws ON f.weekly_flight = ws.id 
         JOIN weekday w ON w.name = ws.weekday 
         JOIN year ON w.year = year.year
-        WHERE flight.flight_number = flightnumber;
+        WHERE f.flight_number = flightnumber;
 
     RETURN ROUND(route_price * profit_factor * weekday_factor * (calculateBookedSeats(flightnumber)+1)/40, 13);
 END //
 
 
 /* A trigger that genereates a ticket number when you insert a new passenger into a booking */ 
-CREATE TRIGGER `unique_ticket_number` BEFORE INSERT ON `passenger_ticket` FOR EACH ROW
+CREATE TRIGGER unique_ticket_number BEFORE INSERT ON passenger_ticket FOR EACH ROW
 BEGIN
     SET NEW.ticket_no = floor( 256203221 + (RAND() * 256203221));
 END //
@@ -460,7 +460,6 @@ BEGIN
     SELECT sleep(2);
 
     /* Everything is OK. Insert the values */
-    /*INSERT IGNORE INTO credit_card VALUES(credit_card_number, cardholder_name);*/
     INSERT INTO credit_card VALUES(credit_card_number, cardholder_name)
         ON DUPLICATE KEY UPDATE ccn=credit_card_number;
 
@@ -484,6 +483,3 @@ CREATE VIEW allFlights AS
         JOIN route r ON (r.departure = ws.departure AND r.arrival = ws.arrival AND r.year = ws.route_year)
         JOIN airport aa ON (aa.airport_code = r.arrival)
         JOIN airport ad ON (ad.airport_code = r.departure);
-
-
-source q10f.sql
