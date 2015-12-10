@@ -1,41 +1,6 @@
-/* Drop all tables */
-DROP TABLE IF EXISTS `contact_responsible`;
-DROP TABLE IF EXISTS `passenger_ticket`;
-DROP TABLE IF EXISTS `reserved_on`;
-DROP TABLE IF EXISTS `contact`;
-DROP TABLE IF EXISTS `passenger`;
-DROP TABLE IF EXISTS `booking`;
-DROP TABLE IF EXISTS `credit_card`;
-DROP TABLE IF EXISTS `reservation`;
-DROP TABLE IF EXISTS `flight`;
-DROP TABLE IF EXISTS `weekly_schedule`;
-DROP TABLE IF EXISTS `route`;
-DROP TABLE IF EXISTS `airport`;
-DROP TABLE IF EXISTS `weekday`;
-DROP TABLE IF EXISTS `year`;
-
-/* Drop all procedures */
-DROP PROCEDURE IF EXISTS `addYear`;
-DROP PROCEDURE IF EXISTS `addDay`;
-DROP PROCEDURE IF EXISTS `addDestination`;
-DROP PROCEDURE IF EXISTS `addRoute`;
-DROP PROCEDURE IF EXISTS `addFlight`;
-
-DROP PROCEDURE IF EXISTS `addReservation`;
-DROP PROCEDURE IF EXISTS `addPassenger`;
-DROP PROCEDURE IF EXISTS `addContact`;
-DROP PROCEDURE IF EXISTS `addPayment`;
-
-/* Drop all functions */
-DROP FUNCTION IF EXISTS `calculateFreeSeats`;
-DROP FUNCTION IF EXISTS `calculatePrice`;
-DROP FUNCTION IF EXISTS `calculateBookedSeats`;
-
-/* Drop all views */
-DROP VIEW IF EXISTS `allFlights`;
+Question 2.
 
 /* Create the tables from the relational model */
-
 
 CREATE TABLE `passenger` (
     `passport_number` INT NOT NULL,
@@ -506,65 +471,121 @@ Question 8.
 a) You can encrypt it. Even if the hackers got access to the database, they would not be able to decode the credit card information.
 
 b)
+1. Stored procedures will reduce the amount of network traffic. You only need to send one statement over the network and then all of the statements in the procedure will be executed on the server. The alternative would be to send all the statements over the network.
+2. Stored procedures can be executed faster. The optimizations that are done when performing a query is done once and compiled for later use, if you were to use individual queries these optimizations would be done every time.
+3. Stored procedures can enhance the security. You can enable users to call stored procedures, even if they are not allowed to execute the statements inside of the procedure directly. 
 
 9.
 
+a) 
 
+Entered in A:
+CALL addReservation("MIT","HOB",2010,1,"Monday","09:00:00",3,@a);
+
+b) No, it is not visible. Since a transaction is executed as an atomic unit and we havn't called COMMIT, the data isn't visible outside of the transaction in A.
+
+c) The statement in B gets stuck and does not finish.
+
+A:
 START TRANSACTION;
-CALL addReservation("MIT","HOB",2010,1,"Monday","09:00:00",3,@a); //Locks table
+CALL addReservation("MIT","HOB",2010,1,"Monday","09:00:00",3,@a); // Adds a write lock to reservation
 COMMIT;
 
-
+B:
 START TRANSACTION;
-update reservation set flight=2; // table is locked
+update reservation set flight=2; // Waiting for A to release the write lock.
 COMMIT;
 
-
-
-
+When the INSERT is executed in session A a write lock is added to make sure that the isolation of transactions is intact. With this lock, B can not modify the data until A has executed COMMIT.
 
 10 a)
 
-No! Before adding a payment the procedure checks so that there are enough unpaid seats left on the flight.
+No. Before adding a payment the procedure checks so that there are enough unpaid seats left on the flight. More details in b.
 
 b) 
 
 
-0 /* Procedure that pays for a reservation */
-CREATE PROCEDURE addPayment(IN reservation_nr INT, IN cardholder_name VARCHAR(30), IN credit_card_number BIGINT)
-BEGIN
-    DECLARE flight_number INT;
-    DECLARE res_count INT;
+<<<<<<< HEAD
+NULL        /* Procedure that pays for a reservation */
+0       CREATE PROCEDURE addPayment(IN reservation_nr INT, IN cardholder_name VARCHAR(30), IN credit_card_number BIGINT)
+1        BEGIN
+2            DECLARE flight_number INT;
+3            DECLARE res_count INT;
+4        
+5            /* Check so that the reservation exists. This procedure call will give an error otherwise */
+6            IF (NOT EXISTS(SELECT reservation_number FROM reservation WHERE reservation_number = reservation_nr)) THEN
+7                SIGNAL SQLSTATE '42002' SET MESSAGE_TEXT = 'The given reservation number does not exist.';
+8            END IF;
+9         
+10           /* Get the flight number and number of seats for the reservation. */
+11          SELECT flight INTO flight_number FROM reservation WHERE reservation_number=reservation_nr;
+12          SELECT COUNT(*) INTO res_count FROM reservation r JOIN reserved_on ro ON r.reservation_number=ro.reservation
+13              WHERE r.reservation_number = reservation_nr;
+14      
+15          /* Check so that there is enough reserved seats */
+16          IF calculateFreeSeats(flight_number) < res_count THEN
+17              DELETE FROM reservation WHERE reservation_number=reservation_nr;
+18              SIGNAL SQLSTATE '42003' SET MESSAGE_TEXT = 'There are not enough seats available on the flight anymore, deleting reservation.';
+19          END IF;
+20      
+21          /* The reservation must have a contact for it to be payable */
+22          IF (NOT EXISTS(SELECT * FROM contact_responsible cr WHERE cr.reservation=reservation_nr)) THEN
+23              SIGNAL SQLSTATE '42004' SET MESSAGE_TEXT = 'The reservation has no contact yet.';
+24          END IF;
+25      
+26          /* Everything is OK. Insert the values */
+27          INSERT INTO credit_card VALUES(credit_card_number, cardholder_name);
+28          INSERT INTO booking VALUES(reservation_nr, calculatePrice(flight_number), credit_card_number);
+29          INSERT INTO passenger_ticket (booking, passenger) 
+30              (SELECT reservation_nr, passport_number FROM reserved_on ro
+31                  JOIN passenger p ON (p.passport_number = ro.passenger) 
+32              WHERE ro.reservation = reservation_nr);
+33            END //
+34
 
-    /* Check so that the reservation exists. This procedure call will give an error otherwise */
-    IF (NOT EXISTS(SELECT reservation_number FROM reservation WHERE reservation_number = reservation_nr)) THEN
-        SIGNAL SQLSTATE '42002' SET MESSAGE_TEXT = 'The given reservation number does not exist.';
-    END IF;
+Yes, it can occur. If both sessions have executed line number 16 before any of them completes the inserts in lines 27-32 we will get an overbooking. Otherwise the check at line 41 will make sure no overbooking occurs.
 
-    /* Get the flight number and number of seats for the reservation. */
-    SELECT flight INTO flight_number FROM reservation WHERE reservation_number=reservation_nr;
-    SELECT COUNT(*) INTO res_count FROM reservation r JOIN reserved_on ro ON r.reservation_number=ro.reservation
-        WHERE r.reservation_number = reservation_nr;
+This problem is called "lost update".
 
-    /* Check so that there is enough reserved seats */
-    IF calculateFreeSeats(flight_number) < res_count THEN
-        DELETE FROM reservation WHERE reservation_number=reservation_nr;
-        SIGNAL SQLSTATE '42003' SET MESSAGE_TEXT = 'There are not enough seats available on the flight anymore, deleting reservation.';
-    END IF;
 
-    /* The reservation must have a contact for it to be payable */
-    IF (NOT EXISTS(SELECT * FROM contact_responsible cr WHERE cr.reservation=reservation_nr)) THEN
-        SIGNAL SQLSTATE '42004' SET MESSAGE_TEXT = 'The reservation has no contact yet.';
-    END IF;
+c)
+=======
+1	0 /* Procedure that pays for a reservation */
+2	"		CREATE PROCEDURE addPayment(IN reservation_nr INT, IN cardholder_name VARCHAR(30), IN credit_card_number BIGINT)"
+3	"		BEGIN"
+4	"		    DECLARE flight_number INT;"
+5	"		    DECLARE res_count INT;"
+6	
+7	"		    /* Check so that the reservation exists. This procedure call will give an error otherwise */"
+8	"		    IF (NOT EXISTS(SELECT reservation_number FROM reservation WHERE reservation_number = reservation_nr)) THEN"
+9	"		        SIGNAL SQLSTATE '42002' SET MESSAGE_TEXT = 'The given reservation number does not exist.';"
+10	"		    END IF;"
+11	
+12	"		    /* Get the flight number and number of seats for the reservation. */"
+13	"		    SELECT flight INTO flight_number FROM reservation WHERE reservation_number=reservation_nr;"
+14	"		    SELECT COUNT(*) INTO res_count FROM reservation r JOIN reserved_on ro ON r.reservation_number=ro.reservation"
+15	"		        WHERE r.reservation_number = reservation_nr;"
+16	
+17	"		    /* Check so that there is enough reserved seats */"
+18	"		    IF calculateFreeSeats(flight_number) < res_count THEN"
+19	"		        DELETE FROM reservation WHERE reservation_number=reservation_nr;"
+20	"		        SIGNAL SQLSTATE '42003' SET MESSAGE_TEXT = 'There are not enough seats available on the flight anymore, deleting reservation.';"
+21	"		    END IF;"
+22	
+23	"		    /* The reservation must have a contact for it to be payable */"
+24	"		    IF (NOT EXISTS(SELECT * FROM contact_responsible cr WHERE cr.reservation=reservation_nr)) THEN"
+25	"		        SIGNAL SQLSTATE '42004' SET MESSAGE_TEXT = 'The reservation has no contact yet.';"
+26	"		    END IF;"
+27	
+28	"		    /* Everything is OK. Insert the values */"
+29	"		    INSERT INTO credit_card VALUES(credit_card_number, cardholder_name);"
+30	"		    INSERT INTO booking VALUES(reservation_nr, calculatePrice(flight_number), credit_card_number);"
+31	"		    INSERT INTO passenger_ticket (booking, passenger) "
+32	"		        (SELECT reservation_nr, passport_number FROM reserved_on ro"
+33	"		            JOIN passenger p ON (p.passport_number = ro.passenger) "
+34	"		        WHERE ro.reservation = reservation_nr);"
+35	"		END //"
 
-    /* Everything is OK. Insert the values */
-    INSERT INTO credit_card VALUES(credit_card_number, cardholder_name);
-    INSERT INTO booking VALUES(reservation_nr, calculatePrice(flight_number), credit_card_number);
-    INSERT INTO passenger_ticket (booking, passenger) 
-        (SELECT reservation_nr, passport_number FROM reserved_on ro
-            JOIN passenger p ON (p.passport_number = ro.passenger) 
-        WHERE ro.reservation = reservation_nr);
-END //
 
 
 If both are done with line 41 (calculateFreeSeats < count reserved) before any completes the inserts from line 52 we will get an overbooking. Otherwise the check at line 41 will make sure no overbooking occurs.
@@ -574,6 +595,48 @@ This is "lost update".
 
 10 c)
 	
-At line 52:
+At line 25 insert:
     SELECT sleep(5);
 
+If you run the queries simultaneously you will notice that an overbooking will occur; both sessions will think that there is enough free seats available when they begin to insert the data into the booking and passenger_ticket tables.
+
+d)
+The following code is used to solve the issue:
+LOCK TABLES booking b READ, 
+            booking WRITE, 
+            contact_responsible cr READ, 
+            credit_card WRITE, 
+            flight f READ,
+            flight READ, 
+            passenger p READ, 
+            passenger_ticket WRITE, 
+            reservation res READ, 
+            reservation WRITE, 
+            reserved_on ro READ, 
+            route r READ, 
+            weekday w READ, 
+            weekly_schedule ws READ,
+            year READ;
+CALL addPayment (@a, "Sauron",7878787878);
+UNLOCK TABLES;
+
+Before calling the critical procedure we acquire locks for all the tables involved in the query (MySQL requires that you lock all the tables if you lock any). Read and write respectively. By doing this we ensure that the first session to call the procedure will finish before the other session makes the first query. Since addPayment is the critical procedure we need to at least keep the locks during its execution. 
+
+Potential secondary index of the database:
+
+Use ticket number as a secondary index for the "passenger_ticket" relation. The "passenger_ticket" relation is ordered by passenger and reservation, so finding an entry using ticket number requires a linear search. Using ticket number as secondary index we can find it by using a binary search. In the index we use ticket number and the disk block of the entry. Below is an example of how this index would improve access to the data.
+
+Example case: We have had (on average) two hundred passengers per day for the last five years. Each entry has passenger: 4 byte (INT), reservation: 4 byte (INT) and ticket number: 4 byte (INT). 12 bytes per entry. We assume a block size for the database of 100 bytes.
+
+entries 									= 200 * 365 * 5 = 365 000
+blocking factor 							= floor(100 / 12) = 8
+blocks 										= ceil(365 000 / 8) = 45 625
+Average linear search (no index) 			= blocks / 2 = 22 812.5
+
+The secondary index on ticket_number is a non-ordering key field and as such has the same amount of entries as the passenger_ticket relation. Each index entry is 8 bytes.
+
+blocking factor (secondary index) 			= floor(100 / 8) = 12
+blocks (secondary index) 					= ceil(365 000 / 12) = 30 417
+Worst case binary search (secondary index) 	= ceil(log_2(blocks)) = 16
+
+As can be seen the improvement is enourmous!

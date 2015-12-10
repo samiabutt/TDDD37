@@ -35,21 +35,7 @@ SELECT SLEEP(2);
 SELECT nr_of_free_seats from allFlights where departure_week = 1;
 SELECT "Making payment, supposed to work for one session and be denied for the other" as "Message";
 
-LOCK TABLES booking b READ, 
-			booking WRITE, 
-			contact_responsible cr READ, 
-			credit_card WRITE, 
-			flight f READ,
-			flight READ, 
-			passenger p READ, 
-			passenger_ticket WRITE, 
-			reservation res READ, 
-			reservation WRITE, 
-			reserved_on ro READ, 
-			route r READ, 
-			weekday w READ, 
-			weekly_schedule ws READ,
-			year READ;
+LOCK TABLES allFlights;
 CALL addPayment (@a, "Sauron",7878787878);
 UNLOCK TABLES;
 
